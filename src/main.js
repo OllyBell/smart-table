@@ -47,9 +47,6 @@ function collectState() {
 function render(action) {
     let state = collectState(); // состояние полей из таблицы
 
-    console.log('📦 Исходные данные (длина):', data.length);
-    console.log('👁 Первая строка данных:', data[0]);
-
     let result = [...data]; // копируем для последующего изменения
     // @todo: использование
 
