@@ -5,35 +5,79 @@ export const initPagination = ({pages, fromRow, toRow, totalRows}, createPage) =
     const pageTemplate = pages.firstElementChild.cloneNode(true);    // в качестве шаблона берём первый элемент из контейнера со страницами
     pages.firstElementChild.remove();                                // и удаляем его (предполагаем, что там больше ничего, как вариант, можно и всё удалить из pages)
 
-    return (data, state, action) => {
-        // @todo: #2.1 — посчитать количество страниц, объявить переменные и константы
-        const rowsPerPage = state.rowsPerPage;                        // будем часто обращаться, чтобы короче записывать
-        const pageCount = Math.ceil(data.length / rowsPerPage);        // число страниц округляем в большую сторону
-        let page = state.page;                                        // страница переменной, потому что она может меняться при обработке действий позже
+    // 2. Переменная для хранения общего количества страниц (чтобы работала кнопка "Last")
+    let pageCount = 0; 
 
-        // @todo: #2.6 — обработать действия
-        if (action) switch(action.name) {
-            case 'prev': page = Math.max(1, page - 1); break;            // переход на предыдущую страницу
-            case 'next': page = Math.min(pageCount, page + 1); break;    // переход на следующую страницу
-            case 'first': page = 1; break;                                // переход на первую страницу
-            case 'last': page = pageCount; break;                        // переход на последнюю страницу
+    /**
+     * ЭТА ФУНКЦИЯ ВЫЗЫВАЕТСЯ ДО ЗАПРОСА К СЕРВЕРУ.
+     * Она берет текущее состояние (page, rowsPerPage) и добавляет параметры в query.
+     * Она НЕ рисует кнопки и НЕ режет данные.
+     */
+    const applyPagination = (query, state, action) => {
+        const limit = state.rowsPerPage;
+        let page = state.page;
+        // let page = parseInt(state.page) || 1;
+
+        // Обработка действий (Prev, Next, First, Last)
+        if (action) {
+            switch (action.name) {
+                case 'prev': page = Math.max(1, page - 1); break;
+                case 'next': 
+                    // Важно: если мы еще не знаем pageCount (первый запуск), считаем условно
+                    // Но лучше брать pageCount из замыкания или передавать его. 
+                    // Для простоты пока используем большое число или текущее pageCount
+                    // page = Math.min(pageCount, page + 1);
+                    page = page + 1;
+                    break;
+                case 'first': page = 1; break;
+                case 'last': //page = pageCount; break;
+                    if (pageCount > 0) {
+                        page = pageCount;
+                    }
+                    break;
+            }
         }
 
-        // @todo: #2.4 — получить список видимых страниц и вывести их
-        const visiblePages = getPages(page, pageCount, 5);                // Получим массив страниц, которые нужно показать, выводим только 5 страниц
-        pages.replaceChildren(...visiblePages.map(pageNumber => {        // перебираем их и создаём для них кнопку
-            const el = pageTemplate.cloneNode(true);                    // клонируем шаблон, который запомнили ранее
-            return createPage(el, pageNumber, pageNumber === page);        // вызываем колбэк из настроек, чтобы заполнить кнопку данными
-        }))
-
-        // @todo: #2.5 — обновить статус пагинации
-        fromRow.textContent = (page - 1) * rowsPerPage + 1;                    // С какой строки выводим
-        toRow.textContent = Math.min((page * rowsPerPage), data.length);    // До какой строки выводим, если это последняя страница, то отображаем оставшееся количество
-        totalRows.textContent = data.length;                                // Сколько всего строк выводим на всех страницах вместе (после фильтрации будет меньше)
-
-        // @todo: #2.2 — посчитать сколько строк нужно пропустить и получить срез данных
-        const skip = (page - 1) * rowsPerPage;            // сколько строк нужно пропустить
-        return data.slice(skip, skip + rowsPerPage);    // получаем нужную часть строк (заменяем имеющийся return)
-        return data.slice(0, 10);
+        // Возвращаем НОВЫЙ объект query с добавленными параметрами limit и page
+        // Мы не меняем исходный query, а создаем новый (принцип иммутабельности)
+        // return Object.assign({}, query, {
+        //     limit,
+        //     page
+        // });
+        return { ...query, limit, page };
     }
+
+    /**
+     * ЭТА ФУНКЦИЯ ВЫЗЫВАЕТСЯ ПОСЛЕ ПОЛУЧЕНИЯ ДАННЫХ ОТ СЕРВЕРА.
+     * Она получает total (сколько всего записей) и обновляет интерфейс пагинации.
+     */
+    const updatePagination = (total, { page, limit }) => {
+        // 1. Считаем реальное количество страниц на основе ответа сервера
+        pageCount = Math.ceil(total / limit);
+        
+        // Гарантируем, что текущая страница не больше общего количества
+        // (на случай, если на последней странице удалили данные)
+        const safePage = Math.min(page, pageCount);
+
+        // 2. Получаем список видимых страниц (например, [1, 2, 3, 4, 5] или [10, 11, 12, 13, 14])
+        const visiblePages = getPages(safePage, pageCount, 5);
+
+        // 3. Рисуем кнопки
+        pages.replaceChildren(...visiblePages.map(pageNumber => {
+            const el = pageTemplate.cloneNode(true);
+            return createPage(el, pageNumber, pageNumber === safePage);
+        }));
+
+        // 4. Обновляем текст статуса ("Showing 1 to 10 of 100")
+        fromRow.textContent = (safePage - 1) * limit + 1;
+        toRow.textContent = Math.min((safePage * limit), total);
+        totalRows.textContent = total;
+    }
+
+    return {
+    updatePagination,
+    applyPagination
+    };
+
+    
 }

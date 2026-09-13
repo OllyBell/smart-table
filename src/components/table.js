@@ -39,13 +39,13 @@ export function initTable(settings, onAction) {
     // @todo: #1.3 —  обработать события и вызвать onAction()
     // 1. Обработка change: просто сигнализируем, что что-то изменилось
     root.container.addEventListener('change', (e) => {
-        onAction(); 
+        onAction(undefined); 
     });
 
     // 2. Обработка reset: ждем, пока браузер очистит поля, потом зовем onAction
     root.container.addEventListener('reset', (e) => {
         setTimeout(() => {
-            onAction();
+            onAction(undefined);
         }, 0);
     });
 

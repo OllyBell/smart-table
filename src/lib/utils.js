@@ -66,10 +66,35 @@ export function processFormData(formData) {
  * объекты по их уникальному идентификатору с вычислительной сложностью O(1)
  * вместо O(n) при переборе массива.
  */
-export const makeIndex = (arr, field, val) => arr.reduce((acc, cur) => ({
-    ...acc,  // Копируем все уже накопленные значения
-    [cur[field]]: val(cur)  // Добавляем новое поле с именем из cur[field] и значением из val(cur)
-}), {});
+// export const makeIndex = (arr, field, val) => arr.reduce((acc, cur) => ({
+//     ...acc,  // Копируем все уже накопленные значения
+//     [cur[field]]: val(cur)  // Добавляем новое поле с именем из cur[field] и значением из val(cur)
+// }), {});
+
+export const makeIndex = (arr, field, val) => {
+    // 1. ГЛАВНАЯ ЗАЩИТА: Проверяем, что это действительно массив
+    if (!Array.isArray(arr)) {
+        console.error('❌ makeIndex: Ожидался массив, но получено:', arr);
+        console.error('💡 Скорее всего, сервер вернул ошибку вместо данных. Проверь вкладку Network в консоли браузера!');
+        return {}; // Возвращаем пустой объект, чтобы приложение не падало
+    }
+
+    // 2. Дополнительная защита: если массив пустой, просто возвращаем пустой объект
+    if (arr.length === 0) {
+        return {};
+    }
+
+    // 3. Если всё ок — делаем свою магию
+    return arr.reduce((acc, cur) => {
+        // Защита на случай, если в массиве попадётся объект без нужного поля
+        if (cur && cur.hasOwnProperty(field)) {
+            acc[cur[field]] = val(cur);
+        } else {
+            console.warn('⚠️ makeIndex: Пропущен элемент без поля', field, ':', cur);
+        }
+        return acc;
+    }, {});
+};
 
 /**
  * Возвращает массив номеров страниц, центрированный вокруг текущей страницы
